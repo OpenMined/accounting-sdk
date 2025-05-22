@@ -9,7 +9,7 @@ requires-python = ">=3.12"
 dependencies = ["requests==2.32.3", "pydantic==2.11.4"]
 
 [project.optional-dependencies]
-dev = ["jupyter==1.1.1"]
+dev = ["jupyter==1.1.1", "python-dotenv==1.1.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/accountingSDK"]

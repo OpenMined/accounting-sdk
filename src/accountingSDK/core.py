@@ -20,11 +20,12 @@ class Transaction(BaseModel):
     id: str
     senderEmail: str
     recipientEmail: str
-    issuedBy: Literal["SENDER", "RECIPIENT"]
+    createdBy: Literal["SYSTEM", "SENDER", "RECIPIENT"]
+    resolvedBy: Union[Literal["SYSTEM", "SENDER", "RECIPIENT"], None]
     amount: float
     status: Literal["PENDING", "COMPLETED", "CANCELLED"]
     createdAt: datetime
-    finalizedAt: Union[datetime, None]
+    resolvedAt: Union[datetime, None]
 
     def __repr__(self):
         model_dict = self.model_dump()
