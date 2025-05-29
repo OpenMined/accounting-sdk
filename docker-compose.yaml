@@ -1,0 +1,24 @@
+services:
+  test-db:
+    image: postgres:17.4
+    container_name: accounting-sdk-dev-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: db
+    profiles:
+      - test
+
+  test-service:
+    image: syftboxregistry.azurecr.io/samples/accounting-api:latest
+    container_name: accounting-sdk-dev-api
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@accounting-sdk-dev-db:5432/db?schema=public
+    env_file: .env
+    ports:
+      - 8080:3000
+    profiles:
+      - test

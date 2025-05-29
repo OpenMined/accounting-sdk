@@ -1,5 +1,5 @@
 import json
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 import requests
 from datetime import datetime
 
@@ -21,11 +21,11 @@ class Transaction(BaseModel):
     senderEmail: str
     recipientEmail: str
     createdBy: Literal["SYSTEM", "SENDER", "RECIPIENT"]
-    resolvedBy: Union[Literal["SYSTEM", "SENDER", "RECIPIENT"], None]
+    resolvedBy: Optional[Literal["SYSTEM", "SENDER", "RECIPIENT"]]
     amount: float
     status: Literal["PENDING", "COMPLETED", "CANCELLED"]
     createdAt: datetime
-    resolvedAt: Union[datetime, None]
+    resolvedAt: Optional[datetime]
 
     def __repr__(self):
         model_dict = self.model_dump()
@@ -48,7 +48,9 @@ class AdminClient:
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"Bearer {self.key}"})
 
-    def create_user(self, *, email: str, password: str = None) -> tuple[User, str]:
+    def create_user(
+        self, *, email: str, password: Optional[str] = None
+    ) -> tuple[User, str]:
         response = self.session.post(
             f"{self.url}/user/create",
             json={"email": email, "password": password},
@@ -101,6 +103,21 @@ class UserClient:
         self.email = email
         self.session = requests.Session()
         self.session.auth = (email, password)
+
+    @classmethod
+    def create_user(
+        cls, *, url: str, email: str, password: Optional[str] = None
+    ) -> tuple[User, str]:
+        response = requests.post(
+            f"{url}/user/create",
+            json={"email": email, "password": password},
+        )
+        if not response.ok:
+            raise ServiceException(response.status_code, response.json())
+
+        if password:
+            return User(**response.json()["user"]), password
+        return User(**response.json()["user"]), response.json()["password"]
 
     def get_user_info(self):
         response = self.session.get(f"{self.url}/user/my-info")
