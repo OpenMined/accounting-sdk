@@ -5,11 +5,10 @@ Core module for the Accounting SDK providing user and transaction management fun
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional, Dict, List, Tuple, TypedDict, Union, overload
+from typing import Literal, Optional, Union
 
 import requests
 from pydantic import BaseModel, EmailStr, Field, validator
-from requests.sessions import Session
 
 
 class User(BaseModel):
