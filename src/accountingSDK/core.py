@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal, Optional, Union
+from enum import Enum
 
 import requests
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class User(BaseModel):
@@ -36,8 +37,32 @@ class User(BaseModel):
         )
 
 
-CreatorType = Literal["SYSTEM", "SENDER", "RECIPIENT"]
-TransactionStatus = Literal["PENDING", "COMPLETED", "CANCELLED"]
+class CreatorType(str, Enum):
+    """Enumeration for the entity that created or resolved a transaction.
+
+    Values:
+        SYSTEM: Transaction created by the system
+        SENDER: Transaction created by the sender
+        RECIPIENT: Transaction created by the recipient
+    """
+
+    SYSTEM = "SYSTEM"
+    SENDER = "SENDER"
+    RECIPIENT = "RECIPIENT"
+
+
+class TransactionStatus(str, Enum):
+    """Enumeration for the status of a transaction.
+
+    Values:
+        PENDING: Transaction is pending confirmation
+        COMPLETED: Transaction has been completed
+        CANCELLED: Transaction has been cancelled
+    """
+
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class Transaction(BaseModel):
@@ -65,7 +90,7 @@ class Transaction(BaseModel):
     createdAt: datetime
     resolvedAt: Optional[datetime] = None
 
-    @validator("amount")
+    @field_validator("amount", mode="before")
     def validate_amount(cls, v: float) -> float:
         """Validate that the transaction amount is positive."""
         if v <= 0:
