@@ -8,8 +8,9 @@ from typing import Optional
 import click
 from dotenv import load_dotenv
 from colorama import init, Fore
+from syft_accounting_sdk.core import UserClient
+from syft_accounting_sdk.error import ServiceException
 
-from accountingSDK.core import UserClient, ServiceException
 
 init()
 

@@ -4,128 +4,16 @@ Core module for the Accounting SDK providing user and transaction management fun
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal, Optional, Union
-from enum import Enum
 
 import requests
-from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from logging import getLogger
+from .error import ServiceException
+from .schemas import User, Transaction
 
 
-class User(BaseModel):
-    """Represents a user in the accounting system.
-
-    Attributes:
-        id: Unique identifier for the user
-        email: User's email address
-        balance: User's current balance
-    """
-
-    id: str
-    email: EmailStr
-    balance: float = Field(ge=0.0)
-
-    def __str__(self) -> str:
-        """Return a human-readable string representation of the user."""
-        return f"User(id={self.id}, email={self.email}, balance={self.balance})"
-
-    def __repr__(self) -> str:
-        """Return a detailed string representation of the user."""
-        model_dict = self.model_dump()
-        return "User\n" + "\n".join(
-            f"  {k + ':':<12} {v}" for k, v in model_dict.items()
-        )
-
-
-class CreatorType(str, Enum):
-    """Enumeration for the entity that created or resolved a transaction.
-
-    Values:
-        SYSTEM: Transaction created by the system
-        SENDER: Transaction created by the sender
-        RECIPIENT: Transaction created by the recipient
-    """
-
-    SYSTEM = "SYSTEM"
-    SENDER = "SENDER"
-    RECIPIENT = "RECIPIENT"
-
-
-class TransactionStatus(str, Enum):
-    """Enumeration for the status of a transaction.
-
-    Values:
-        PENDING: Transaction is pending confirmation
-        COMPLETED: Transaction has been completed
-        CANCELLED: Transaction has been cancelled
-    """
-
-    PENDING = "PENDING"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-
-
-class Transaction(BaseModel):
-    """Represents a financial transaction between users.
-
-    Attributes:
-        id: Unique identifier for the transaction
-        senderEmail: Email of the user sending the funds
-        recipientEmail: Email of the user receiving the funds
-        createdBy: Entity that created the transaction
-        resolvedBy: Entity that resolved (completed/cancelled) the transaction
-        amount: Amount of money being transferred
-        status: Current status of the transaction
-        createdAt: Timestamp when the transaction was created
-        resolvedAt: Timestamp when the transaction was resolved
-    """
-
-    id: str
-    senderEmail: EmailStr
-    recipientEmail: EmailStr
-    createdBy: CreatorType
-    resolvedBy: Optional[CreatorType] = None
-    amount: float = Field(gt=0.0)
-    status: TransactionStatus
-    createdAt: datetime
-    resolvedAt: Optional[datetime] = None
-
-    @field_validator("amount", mode="before")
-    def validate_amount(cls, v: float) -> float:
-        """Validate that the transaction amount is positive."""
-        if v <= 0:
-            raise ValueError("Transaction amount must be positive")
-        return v
-
-    def __str__(self) -> str:
-        """Return a human-readable string representation of the transaction."""
-        return (
-            f"Transaction(id={self.id}, from={self.senderEmail}, "
-            f"to={self.recipientEmail}, amount={self.amount}, status={self.status})"
-        )
-
-    def __repr__(self) -> str:
-        """Return a detailed string representation of the transaction."""
-        model_dict = self.model_dump()
-        return "Transaction\n" + "\n".join(
-            f"  {k + ':':<15} {v}" for k, v in model_dict.items()
-        )
-
-
-class ServiceException(Exception):
-    """Exception raised for errors in the accounting service.
-
-    Attributes:
-        status_code: HTTP status code of the error
-        body: Response body containing error details
-        message: Formatted error message
-    """
-
-    def __init__(self, status_code: int, body: dict[str, str]) -> None:
-        self.status_code = status_code
-        self.body = body
-        self.message = f"Error {status_code}: {body}"
-        super().__init__(self.message)
+logger = getLogger(__name__)
 
 
 class AdminClient:
@@ -247,6 +135,70 @@ class AdminClient:
             return users
 
         return {user.email: user for user in users}
+
+
+class TransactionCtx:
+    """Context manager for handling the lifecycle of a transaction.
+
+    On entering, creates a transaction. If not confirmed by the user, cancels the transaction on exit.
+
+    Args:
+        client: UserClient instance
+        email: Email of the recipient
+        amount: Amount to transfer
+    """
+
+    def __init__(self, client: "UserClient", email: str, amount: float):
+        self.client = client
+        self.email = email
+        self.amount = amount
+        self.transaction: Optional[Transaction] = None
+        self._confirmed = False
+
+    def __enter__(self) -> "TransactionCtx":
+        self.transaction = self.client.create_transaction(
+            recipientEmail=self.email, amount=self.amount
+        )
+        return self
+
+    def confirm(self) -> Transaction:
+        if self.transaction is None:
+            raise RuntimeError("No transaction to confirm.")
+        self.transaction = self.client.confirm_transaction(id=self.transaction.id)
+        self._confirmed = True
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self._confirmed and self.transaction is not None:
+            try:
+                self.transaction = self.client.cancel_transaction(
+                    id=self.transaction.id
+                )
+            except Exception:
+                raise ServiceException(500, {"message": "Failed to cancel transaction"})
+
+
+class DelegatedTransactionCtx(TransactionCtx):
+    """Context manager for handling the lifecycle of a delegated transaction.
+
+    On entering, creates a transaction on behalf of another user.
+    If not confirmed by the user, cancels the transaction on exit.
+
+    Args:
+        client: UserClient instance
+        email: Email of the user who is authorizing the transaction
+        amount: Amount to transfer
+        token: Delegation token authorizing the transaction
+    """
+
+    def __init__(self, client: "UserClient", email: str, amount: float, token: str):
+        super().__init__(client, email, amount)
+        self.token = token
+
+    def __enter__(self) -> "DelegatedTransactionCtx":
+        self.transaction = self.client.create_delegated_transaction(
+            senderEmail=self.email, amount=self.amount, token=self.token
+        )
+        return self
 
 
 class UserClient:
@@ -442,3 +394,29 @@ class UserClient:
             raise ServiceException(response.status_code, response.json())
 
         return Transaction(**response.json()["transaction"])
+
+    def transfer(self, recipientEmail: str, amount: float) -> TransactionCtx:
+        """Convenience method to use TransactionContext as a context manager.
+
+        Args:
+            recipientEmail: Email of the recipient
+            amount: Amount to transfer
+        Returns:
+            TransactionContext instance
+        """
+        return TransactionCtx(self, recipientEmail, amount)
+
+    def delegated_transfer(
+        self, senderEmail: str, amount: float, token: str
+    ) -> DelegatedTransactionCtx:
+        """Convenience method to use DelegatedTransactionCtx as a context manager.
+
+        Args:
+            senderEmail: Email of the sender, who is authorizing the transaction
+            amount: Amount to transfer
+            token: Delegation token authorizing the transaction
+
+        Returns:
+            DelegatedTransactionContext instance
+        """
+        return DelegatedTransactionCtx(self, senderEmail, amount, token)
