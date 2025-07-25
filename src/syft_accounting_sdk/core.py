@@ -420,3 +420,19 @@ class UserClient:
             DelegatedTransactionContext instance
         """
         return DelegatedTransactionCtx(self, senderEmail, amount, token)
+
+    def get_transaction_history(self) -> list[Transaction]:
+        """Get the transaction history for the current user.
+
+        Returns:
+            List of Transaction objects
+
+        Raises:
+            ServiceException: If the transaction history retrieval fails
+        """
+        response = self._session.get(f"{self.url}/transaction/history")
+
+        if not response.ok:
+            raise ServiceException(response.status_code, response.json())
+
+        return [Transaction(**item) for item in response.json()["transactions"]]
