@@ -430,9 +430,11 @@ class UserClient:
         Raises:
             ServiceException: If the transaction history retrieval fails
         """
-        response = self._session.get(f"{self.url}/transaction/history")
+        response = self._session.get(f"{self.url}/transactions")
 
         if not response.ok:
             raise ServiceException(response.status_code, response.json())
 
-        return [Transaction(**item) for item in response.json()["transactions"]]
+        response_json = response.json()
+
+        return [Transaction(**item) for item in response_json["transactions"]]

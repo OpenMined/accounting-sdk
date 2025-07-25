@@ -50,12 +50,6 @@ class Transaction(BaseModel):
     createdAt: datetime
     resolvedAt: Optional[datetime] = None
 
-    @field_validator("amount", mode="before")
-    def validate_amount(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Transaction amount must be positive")
-        return v
-
     def __str__(self) -> str:
         return (
             f"Transaction(id={self.id}, from={self.senderEmail}, "
