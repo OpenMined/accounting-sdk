@@ -10,6 +10,7 @@ class User(BaseModel):
     id: str
     email: EmailStr
     balance: float = Field(ge=0.0)
+    organization: Optional[str] = None
 
     def __str__(self) -> str:
         return f"User(id={self.id}, email={self.email}, balance={self.balance})"
@@ -49,6 +50,8 @@ class Transaction(BaseModel):
     status: TransactionStatus
     createdAt: datetime
     resolvedAt: Optional[datetime] = None
+    appName: Optional[str] = None
+    appEpPath: Optional[str] = None
 
     def __str__(self) -> str:
         return (

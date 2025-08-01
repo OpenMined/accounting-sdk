@@ -38,12 +38,17 @@ class AdminClient:
         self._session.headers.update({"Authorization": f"Bearer {self.key}"})
 
     def create_user(
-        self, *, email: str, password: Optional[str] = None
+        self,
+        *,
+        email: str,
+        organization: str,
+        password: Optional[str] = None,
     ) -> tuple[User, str]:
         """Create a new user in the accounting system.
 
         Args:
             email: Email address for the new user
+            organization: Name of the organization the user belongs to
             password: Optional password for the user. If not provided, one will be generated
 
         Returns:
@@ -54,7 +59,7 @@ class AdminClient:
         """
         response = self._session.post(
             f"{self.url}/user/create",
-            json={"email": email, "password": password},
+            json={"email": email, "password": password, "organization": organization},
         )
         if not response.ok:
             raise ServiceException(response.status_code, response.json())
@@ -148,7 +153,14 @@ class TransactionCtx:
         amount: Amount to transfer
     """
 
-    def __init__(self, client: "UserClient", email: str, amount: float):
+    def __init__(
+        self,
+        client: "UserClient",
+        email: str,
+        amount: float,
+        appName: Optional[str] = None,
+        appEpPath: Optional[str] = None,
+    ):
         self.client = client
         self.email = email
         self.amount = amount
@@ -157,7 +169,10 @@ class TransactionCtx:
 
     def __enter__(self) -> "TransactionCtx":
         self.transaction = self.client.create_transaction(
-            recipientEmail=self.email, amount=self.amount
+            recipientEmail=self.email,
+            amount=self.amount,
+            appName=self.appName,
+            appEpPath=self.appEpPath,
         )
         return self
 
@@ -225,7 +240,12 @@ class UserClient:
 
     @classmethod
     def create_user(
-        cls, *, url: str, email: str, password: Optional[str] = None
+        cls,
+        *,
+        url: str,
+        email: str,
+        organization: str,
+        password: Optional[str] = None,
     ) -> tuple[User, str]:
         """Create a new user and return a client instance.
 
@@ -242,7 +262,11 @@ class UserClient:
         """
         response = requests.post(
             f"{url.rstrip('/')}/user/create",
-            json={"email": email, "password": password},
+            json={
+                "email": email,
+                "password": password,
+                "organization": organization,
+            },
         )
         if not response.ok:
             raise ServiceException(response.status_code, response.json())
@@ -266,12 +290,21 @@ class UserClient:
 
         return User(**response.json()["user"])
 
-    def create_transaction(self, *, recipientEmail: str, amount: float) -> Transaction:
+    def create_transaction(
+        self,
+        *,
+        recipientEmail: str,
+        amount: float,
+        appName: Optional[str] = None,
+        appEpPath: Optional[str] = None,
+    ) -> Transaction:
         """Create a new transaction from the current user.
 
         Args:
             recipientEmail: Email of the recipient
             amount: Amount to transfer
+            appName: Name of the application initiating the transaction
+            appEpPath: Path of the endpoint initiating the transaction
 
         Returns:
             Created Transaction object
@@ -289,6 +322,8 @@ class UserClient:
                 "senderEmail": self.email,
                 "recipientEmail": recipientEmail,
                 "amount": amount,
+                "appName": appName,
+                "appEpPath": appEpPath,
             },
         )
 
@@ -298,7 +333,13 @@ class UserClient:
         return Transaction(**response.json()["transaction"])
 
     def create_delegated_transaction(
-        self, *, senderEmail: str, amount: float, token: str
+        self,
+        *,
+        senderEmail: str,
+        amount: float,
+        token: str,
+        appName: Optional[str] = None,
+        appEpPath: Optional[str] = None,
     ) -> Transaction:
         """Create a transaction on behalf of another user using a delegation token.
 
@@ -324,6 +365,8 @@ class UserClient:
                 "recipientEmail": self.email,
                 "amount": amount,
                 "token": token,
+                "appName": appName,
+                "appEpPath": appEpPath,
             },
         )
 
@@ -438,3 +481,49 @@ class UserClient:
         response_json = response.json()
 
         return [Transaction(**item) for item in response_json["transactions"]]
+
+    def update_password(self, *, old_password: str, new_password: str) -> User:
+        """Update the password for the current user.
+
+        Args:
+            old_password: Old password for the user
+            new_password: New password for the user
+
+        Returns:
+            Updated User object
+
+        Raises:
+            ServiceException: If the password update fails
+        """
+
+        response = self._session.put(
+            f"{self.url}/user/update-password",
+            json={"oldPassword": old_password, "newPassword": new_password},
+        )
+
+        if not response.ok:
+            raise ServiceException(response.status_code, response.json())
+
+        return User(**response.json()["user"])
+
+    def update_organization(self, *, organization: str) -> User:
+        """Update the organization for the current user.
+
+        Args:
+            organization: New organization for the user
+
+        Returns:
+            Updated User object
+
+        Raises:
+            ServiceException: If the organization update fails
+        """
+        response = self._session.put(
+            f"{self.url}/user/update-organization",
+            json={"organization": organization},
+        )
+
+        if not response.ok:
+            raise ServiceException(response.status_code, response.json())
+
+        return User(**response.json()["user"])
