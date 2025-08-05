@@ -166,6 +166,8 @@ class TransactionCtx:
         self.amount = amount
         self.transaction: Optional[Transaction] = None
         self._confirmed = False
+        self.appName = appName
+        self.appEpPath = appEpPath
 
     def __enter__(self) -> "TransactionCtx":
         self.transaction = self.client.create_transaction(
@@ -181,6 +183,7 @@ class TransactionCtx:
             raise RuntimeError("No transaction to confirm.")
         self.transaction = self.client.confirm_transaction(id=self.transaction.id)
         self._confirmed = True
+        return self.transaction
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self._confirmed and self.transaction is not None:
@@ -205,13 +208,25 @@ class DelegatedTransactionCtx(TransactionCtx):
         token: Delegation token authorizing the transaction
     """
 
-    def __init__(self, client: "UserClient", email: str, amount: float, token: str):
-        super().__init__(client, email, amount)
+    def __init__(
+        self,
+        client: "UserClient",
+        email: str,
+        amount: float,
+        token: str,
+        appName: Optional[str] = None,
+        appEpPath: Optional[str] = None,
+    ):
+        super().__init__(client, email, amount, appName, appEpPath)
         self.token = token
 
     def __enter__(self) -> "DelegatedTransactionCtx":
         self.transaction = self.client.create_delegated_transaction(
-            senderEmail=self.email, amount=self.amount, token=self.token
+            senderEmail=self.email,
+            amount=self.amount,
+            token=self.token,
+            appName=self.appName,
+            appEpPath=self.appEpPath,
         )
         return self
 
