@@ -453,7 +453,13 @@ class UserClient:
 
         return Transaction(**response.json()["transaction"])
 
-    def transfer(self, recipientEmail: str, amount: float) -> TransactionCtx:
+    def transfer(
+        self,
+        recipientEmail: str,
+        amount: float,
+        app_name: Optional[str] = None,
+        app_ep_path: Optional[str] = None,
+    ) -> TransactionCtx:
         """Convenience method to use TransactionContext as a context manager.
 
         Args:
@@ -462,10 +468,15 @@ class UserClient:
         Returns:
             TransactionContext instance
         """
-        return TransactionCtx(self, recipientEmail, amount)
+        return TransactionCtx(self, recipientEmail, amount, app_name, app_ep_path)
 
     def delegated_transfer(
-        self, senderEmail: str, amount: float, token: str
+        self,
+        senderEmail: str,
+        amount: float,
+        token: str,
+        app_name: Optional[str] = None,
+        app_ep_path: Optional[str] = None,
     ) -> DelegatedTransactionCtx:
         """Convenience method to use DelegatedTransactionCtx as a context manager.
 
@@ -477,7 +488,9 @@ class UserClient:
         Returns:
             DelegatedTransactionContext instance
         """
-        return DelegatedTransactionCtx(self, senderEmail, amount, token)
+        return DelegatedTransactionCtx(
+            self, senderEmail, amount, token, app_name, app_ep_path
+        )
 
     def get_transaction_history(self) -> list[Transaction]:
         """Get the transaction history for the current user.
