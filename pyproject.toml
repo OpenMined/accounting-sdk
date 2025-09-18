@@ -5,8 +5,23 @@ build-backend = "hatchling.build"
 [project]
 name = "syft-accounting-sdk"
 version = "0.1.0"
+description = "Python SDK for Syft Accounting Service"
+readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["requests==2.32.3", "pydantic==2.11.4", "click==8.1.3"]
+license = {text = "MIT"}
+authors = [
+    {name = "OpenMined", email = "shubham@openmined.org"}
+]
+maintainers = [
+    {name = "OpenMined", email = "shubham@openmined.org"}
+]
+dependencies = ["requests==2.32.3", "pydantic[email]==2.11.4", "click==8.1.3", "python-dotenv==1.1.0", "colorama==0.4.6"]
+
+[project.urls]
+Homepage = "https://github.com/OpenMined/accounting-sdk"
+Repository = "https://github.com/OpenMined/accounting-sdk"
+Documentation = "https://github.com/OpenMined/accounting-sdk"
+"Bug Tracker" = "https://github.com/OpenMined/accounting-sdk/issues"
 
 [project.scripts]
 accounting = "syft_accounting_sdk.cli:accounting"
