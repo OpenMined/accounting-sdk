@@ -46,7 +46,7 @@ class Transaction(BaseModel):
     recipientEmail: EmailStr
     createdBy: CreatorType
     resolvedBy: Optional[CreatorType] = None
-    amount: float = Field(gt=0.0)
+    amount: float = Field(gte=0.0)
     status: TransactionStatus
     createdAt: datetime
     resolvedAt: Optional[datetime] = None
